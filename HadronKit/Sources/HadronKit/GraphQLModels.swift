@@ -69,9 +69,13 @@ public struct MeUser: Decodable, Sendable {
     public let name: String?
     public let email: String?
     public let handle: String?
+    /// Provider-sourced profile image (GitHub/Google both populate it).
+    public let avatarUrl: String?
 
     public var displayName: String {
-        handle ?? name ?? email ?? "Signed in"
+        // Handle last: auto-provisioned accounts get an opaque hex handle,
+        // which reads like a bug when it leads the account menu.
+        name ?? email ?? handle ?? "Signed in"
     }
 }
 

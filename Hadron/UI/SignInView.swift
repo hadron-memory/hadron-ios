@@ -35,6 +35,8 @@ struct SignInView: View {
                 // page routes its unauthenticated leg by login_provider, so
                 // the choice must happen here, before the web sheet opens.
                 VStack(spacing: 10) {
+                    providerButton("Continue with Apple", provider: .apple, symbol: "apple.logo")
+                        .tint(.primary)
                     providerButton("Continue with GitHub", provider: .github)
                     providerButton("Continue with Google", provider: .google)
                 }
@@ -43,6 +45,13 @@ struct SignInView: View {
             Text("Sign in with your Hadron account to search your memories.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            // Markdown links render tappable; shown pre-sign-in because
+            // signing in can create the account (App Review optics).
+            Text("By continuing you agree to the [Terms of Service](https://docs.hadronmemory.com/legal/terms/) and [Privacy Statement](https://docs.hadronmemory.com/legal/privacy/).")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
 
             if let message = state.errorMessage {
@@ -57,14 +66,23 @@ struct SignInView: View {
         .padding(.horizontal, 32)
     }
 
-    private func providerButton(_ title: String, provider: OAuthService.LoginProvider) -> some View {
+    private func providerButton(
+        _ title: String,
+        provider: OAuthService.LoginProvider,
+        symbol: String? = nil
+    ) -> some View {
         Button {
             state.signIn(with: provider)
         } label: {
-            Text(title)
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
+            HStack(spacing: 6) {
+                if let symbol {
+                    Image(systemName: symbol)
+                }
+                Text(title)
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
         }
         .buttonStyle(.borderedProminent)
     }

@@ -38,7 +38,7 @@ public struct HadronClient {
 
     public func me() async throws -> MeUser? {
         struct Payload: Decodable { let me: MeUser? }
-        let query = "query { me { id name email handle } }"
+        let query = "query { me { id name email handle avatarUrl } }"
         return try await run(query, Payload.self).me
     }
 

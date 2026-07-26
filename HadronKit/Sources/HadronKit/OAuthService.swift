@@ -38,11 +38,12 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
     /// First-party identity provider the server's authorize page routes the
     /// unauthenticated leg through (`login_provider` query param, spec 025).
     /// Omitting it falls back to the server default (GitHub) — always pass
-    /// one explicitly in UI with multiple sign-in buttons. `apple` is not in
-    /// the server allowlist yet (hadron-server#794).
+    /// one explicitly in UI with multiple sign-in buttons. `apple` requires
+    /// hadron-server#798 deployed (plus the APPLE_* env quad).
     public enum LoginProvider: String, Sendable {
         case github
         case google
+        case apple
     }
 
     private struct ASMetadata: Decodable {

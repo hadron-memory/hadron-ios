@@ -7,6 +7,7 @@ import HadronKit
 struct HomeView: View {
     @EnvironmentObject private var state: AppState
     @State private var showSignOutConfirmation = false
+    @State private var showAbout = false
 
     var body: some View {
         NavigationStack {
@@ -31,6 +32,9 @@ struct HomeView: View {
             .navigationDestination(for: HadronNode.self) { node in
                 NodeDetailView(node: node)
             }
+            .navigationDestination(isPresented: $showAbout) {
+                AboutView()
+            }
             .toolbar { accountMenu }
             .refreshable { await state.loadAll() }
             .overlay(alignment: .bottom) { errorBanner }
@@ -44,11 +48,18 @@ struct HomeView: View {
         if state.isLoading && state.memories.isEmpty {
             ProgressView("Loading…")
         } else if state.memories.isEmpty {
-            ContentUnavailableView(
-                "No Memories",
-                systemImage: "brain",
-                description: Text("Memories you can read will appear here.")
-            )
+            // A fresh account lands here (sign-in auto-creates one) — make
+            // the empty state a starting point, not a dead end.
+            ContentUnavailableView {
+                Label("No Memories Yet", systemImage: "brain")
+            } description: {
+                Text("Create your first memory on the Hadron portal — it will appear here, ready to search.")
+            } actions: {
+                Link(destination: AppState.config.portalBaseURL.appendingPathComponent("app")) {
+                    Text("Open the Portal")
+                }
+                .buttonStyle(.borderedProminent)
+            }
         } else {
             List {
                 Section("Memories (\(state.memories.count))") {
@@ -102,11 +113,14 @@ struct HomeView: View {
                         }
                     }
                 }
+                Button("About", systemImage: "info.circle") {
+                    showAbout = true
+                }
                 Button("Sign Out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
                     showSignOutConfirmation = true
                 }
             } label: {
-                Image(systemName: "person.crop.circle")
+                avatarLabel
             }
             .confirmationDialog(
                 "Sign out of Hadron?",
@@ -115,6 +129,23 @@ struct HomeView: View {
             ) {
                 Button("Sign Out", role: .destructive) { state.signOut() }
             }
+        }
+    }
+
+    /// Provider avatar when the account has one, SF Symbol placeholder
+    /// otherwise (and while the image loads).
+    @ViewBuilder
+    private var avatarLabel: some View {
+        if let avatarUrl = state.me?.avatarUrl, let url = URL(string: avatarUrl) {
+            AsyncImage(url: url) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Image(systemName: "person.crop.circle")
+            }
+            .frame(width: 28, height: 28)
+            .clipShape(Circle())
+        } else {
+            Image(systemName: "person.crop.circle")
         }
     }
 
