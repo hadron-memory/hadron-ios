@@ -54,7 +54,10 @@ struct HomeView: View {
                 Section("Memories (\(state.memories.count))") {
                     ForEach(state.memories) { memory in
                         NavigationLink(value: memory) {
-                            MemoryRow(memory: memory)
+                            MemoryRow(
+                                memory: memory,
+                                isShared: state.sharedMemoryIds.contains(memory.id)
+                            )
                         }
                     }
                 }

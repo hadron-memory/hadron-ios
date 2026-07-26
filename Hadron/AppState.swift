@@ -26,6 +26,8 @@ final class AppState: ObservableObject {
     @Published var authState: AuthState = .signedOut
     @Published var me: MeUser?
     @Published var memories: [Memory] = []
+    /// Ids of memories the user reaches via a MemoryShare grant (badged in the list).
+    @Published var sharedMemoryIds: Set<String> = []
     @Published var searchResults: [HadronNode] = []
     @Published var searchQuery: String = ""
     @Published var isLoading = false
@@ -92,9 +94,16 @@ final class AppState: ObservableObject {
         defer { isLoading = false }
         do {
             async let meResult = client.me()
-            async let memoriesResult = client.myMemories()
+            async let ownResult = client.myMemories()
+            async let sharedResult = client.sharedMemories()
             self.me = try await meResult
-            self.memories = try await memoriesResult
+            // Merge the default surface with shared-with-me grants (the
+            // server keeps those behind an explicit filter); dedupe by id.
+            let own = try await ownResult
+            let shared = try await sharedResult
+            let ownIds = Set(own.map(\.id))
+            self.sharedMemoryIds = Set(shared.map(\.id)).subtracting(ownIds)
+            self.memories = (own + shared.filter { !ownIds.contains($0.id) })
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         } catch {
             handle(error)

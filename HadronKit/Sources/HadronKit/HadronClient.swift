@@ -43,24 +43,36 @@ public struct HadronClient {
     }
 
     public func myMemories() async throws -> [Memory] {
+        try await memoriesList(sharedWithMe: false)
+    }
+
+    /// Memories another user granted to the caller (MemoryShare). NOT part of
+    /// the default `memories()` surface — the server keeps grants behind the
+    /// explicit `sharedWithMe` filter, so a complete "everything I can read"
+    /// list must merge both calls.
+    public func sharedMemories() async throws -> [Memory] {
+        try await memoriesList(sharedWithMe: true)
+    }
+
+    private func memoriesList(sharedWithMe: Bool) async throws -> [Memory] {
         struct Payload: Decodable { let memories: Page<Memory> }
         // Uniform read surface (hadron-server #473): memories() replaces
         // myMemories and returns an { items, total } page (limit cap 200).
         // The old query returned the complete list, so offset-page until the
         // envelope's total is reached — the apps show all memories.
         let query = """
-        query($limit: Int, $offset: Int) {
-          memories(limit: $limit, offset: $offset) {
+        query($filter: MemoryFilter, $limit: Int, $offset: Int) {
+          memories(filter: $filter, limit: $limit, offset: $offset) {
             total
             items { id urn name shortDescription class }
           }
         }
         """
         return try await fetchAllPages { limit, offset in
-            try await run(
-                query, Payload.self,
-                variables: ["limit": limit, "offset": offset]
-            ).memories
+            var variables: [String: Any] = ["limit": limit, "offset": offset]
+            // Omitted (not null/false) when unset — the default surface.
+            if sharedWithMe { variables["filter"] = ["sharedWithMe": true] }
+            return try await run(query, Payload.self, variables: variables).memories
         }
     }
 

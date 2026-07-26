@@ -105,9 +105,10 @@ struct NodeDetailView: View {
     }
 }
 
-/// Renders markdown line-by-line with `AttributedString` (which handles
-/// inline markdown only) so paragraph breaks survive; falls back to plain
-/// text for lines that fail to parse.
+/// Lightweight markdown renderer: block structure (headings vs paragraphs)
+/// is split line-wise here, inline markdown (bold/italic/code/links) is
+/// handled by `AttributedString`, with a plain-text fallback for lines that
+/// fail to parse.
 struct MarkdownText: View {
     let text: String
 
@@ -115,19 +116,66 @@ struct MarkdownText: View {
         self.text = text
     }
 
+    private enum Block {
+        case heading(level: Int, text: String)
+        case paragraph(String)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
-                Text(attributed(paragraph))
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .heading(let level, let heading):
+                    Text(attributed(heading))
+                        .font(headingFont(level))
+                        .padding(.top, 4)
+                case .paragraph(let paragraph):
+                    Text(attributed(paragraph))
+                }
             }
         }
     }
 
-    private var paragraphs: [String] {
-        text
-            .components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+    /// Headings become their own blocks; consecutive non-heading lines merge
+    /// into a paragraph until a blank line (single newlines survive inside a
+    /// paragraph — list items stay one-per-line).
+    private var blocks: [Block] {
+        var result: [Block] = []
+        var current: [String] = []
+        func flush() {
+            let paragraph = current.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !paragraph.isEmpty { result.append(.paragraph(paragraph)) }
+            current = []
+        }
+        for line in text.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty {
+                flush()
+            } else if let heading = parseHeading(trimmed) {
+                flush()
+                result.append(.heading(level: heading.level, text: heading.text))
+            } else {
+                current.append(line)
+            }
+        }
+        flush()
+        return result
+    }
+
+    private func parseHeading(_ line: String) -> (level: Int, text: String)? {
+        let hashes = line.prefix(while: { $0 == "#" })
+        guard (1...6).contains(hashes.count) else { return nil }
+        let rest = line.dropFirst(hashes.count)
+        guard rest.first == " " else { return nil }
+        return (hashes.count, rest.trimmingCharacters(in: .whitespaces))
+    }
+
+    private func headingFont(_ level: Int) -> Font {
+        switch level {
+        case 1: return .title2.bold()
+        case 2: return .title3.bold()
+        default: return .headline
+        }
     }
 
     private func attributed(_ paragraph: String) -> AttributedString {
