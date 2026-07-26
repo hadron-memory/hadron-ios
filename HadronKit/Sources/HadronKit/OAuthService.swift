@@ -35,6 +35,16 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
         }
     }
 
+    /// First-party identity provider the server's authorize page routes the
+    /// unauthenticated leg through (`login_provider` query param, spec 025).
+    /// Omitting it falls back to the server default (GitHub) — always pass
+    /// one explicitly in UI with multiple sign-in buttons. `apple` is not in
+    /// the server allowlist yet (hadron-server#794).
+    public enum LoginProvider: String, Sendable {
+        case github
+        case google
+    }
+
     private struct ASMetadata: Decodable {
         let authorization_endpoint: String
         let token_endpoint: String
@@ -61,7 +71,7 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
     // MARK: - Public entry point
 
     /// Run the full flow and return the issued access token.
-    public func authenticate() async throws -> String {
+    public func authenticate(loginProvider: LoginProvider? = nil) async throws -> String {
         let metadata = try await fetchMetadata()
         let clientId = try await ensureClientId(registrationEndpoint: metadata.registration_endpoint)
 
@@ -71,7 +81,8 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
             endpoint: metadata.authorization_endpoint,
             clientId: clientId,
             pkce: pkce,
-            state: state
+            state: state,
+            loginProvider: loginProvider
         ) else {
             throw OAuthError.authorizationFailed("Invalid authorization endpoint URL.")
         }
@@ -134,9 +145,15 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
         return decoded.client_id
     }
 
-    private func buildAuthorizeURL(endpoint: String, clientId: String, pkce: PKCEPair, state: String) -> URL? {
+    private func buildAuthorizeURL(
+        endpoint: String,
+        clientId: String,
+        pkce: PKCEPair,
+        state: String,
+        loginProvider: LoginProvider?
+    ) -> URL? {
         guard var components = URLComponents(string: endpoint) else { return nil }
-        components.queryItems = [
+        var items: [URLQueryItem] = [
             .init(name: "response_type", value: "code"),
             .init(name: "client_id", value: clientId),
             .init(name: "redirect_uri", value: config.redirectURI),
@@ -146,6 +163,10 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
             .init(name: "code_challenge_method", value: pkce.method),
             .init(name: "state", value: state),
         ]
+        if let loginProvider {
+            items.append(.init(name: "login_provider", value: loginProvider.rawValue))
+        }
+        components.queryItems = items
         return components.url
     }
 

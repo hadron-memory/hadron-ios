@@ -51,13 +51,13 @@ final class AppState: ObservableObject {
 
     // MARK: - Auth
 
-    func signIn() {
+    func signIn(with provider: OAuthService.LoginProvider) {
         guard authState != .signingIn else { return }
         authState = .signingIn
         errorMessage = nil
         Task {
             do {
-                let token = try await oauth.authenticate()
+                let token = try await oauth.authenticate(loginProvider: provider)
                 keychain.set(token, for: .accessToken)
                 authState = .signedIn
                 await loadAll()
