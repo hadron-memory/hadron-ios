@@ -11,11 +11,11 @@ struct SignInView: View {
         VStack(spacing: 16) {
             Spacer()
 
+            // The round mark ships with its own circular alpha edge — no clip.
             Image("HadronMark")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 96, height: 96)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
 
             Text("Hadron")
                 .font(.largeTitle.bold())

@@ -11,7 +11,6 @@ struct AboutView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 64, height: 64)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     Text("Hadron")
                         .font(.title3.bold())
                     Text("Version \(Self.version) (\(Self.build))")
