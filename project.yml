@@ -30,6 +30,7 @@ targets:
         # apps to Swift 6 mode together, with HadronKit.
         SWIFT_VERSION: "5.0"
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: V2NXQ22BM9
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: false
         ENABLE_USER_SCRIPT_SANDBOXING: true
