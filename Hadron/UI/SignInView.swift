@@ -39,6 +39,7 @@ struct SignInView: View {
                         .tint(.primary)
                     providerButton("Continue with GitHub", provider: .github, asset: "GitHubMark")
                     providerButton("Continue with Google", provider: .google, asset: "GoogleMark")
+                    providerButton("Continue with Email", provider: .email, symbol: "envelope")
                 }
             }
 

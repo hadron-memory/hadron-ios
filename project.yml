@@ -40,6 +40,14 @@ targets:
       path: Hadron/Info.plist
       properties:
         CFBundleDisplayName: Hadron
+        # The OAuth redirect scheme. ASWebAuthenticationSession intercepts it
+        # internally, but the email magic-link leg completes in the system
+        # browser (outside the sheet), so the OS must be able to route the
+        # final redirect to the app via onOpenURL.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.hadronmemory.ios
+            CFBundleURLSchemes:
+              - com.hadronmemory.ios
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:

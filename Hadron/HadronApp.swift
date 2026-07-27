@@ -9,6 +9,9 @@ struct HadronApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(state)
+                .onOpenURL { url in
+                    state.handleOAuthCallback(url)
+                }
         }
     }
 }

@@ -72,6 +72,13 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Forward a custom-scheme URL from `.onOpenURL` — completes the email
+    /// magic-link sign-in, whose final redirect arrives from the system
+    /// browser rather than the in-app auth sheet.
+    func handleOAuthCallback(_ url: URL) {
+        _ = oauth.handleCallback(url)
+    }
+
     /// Deletes the access token but never the cached DCR client id — losing
     /// it would re-register on next sign-in and burn the DCR rate limit.
     func signOut() {

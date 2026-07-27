@@ -44,6 +44,10 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
         case github
         case google
         case apple
+        /// Magic-link email (hadron-server#804). The link completes in the
+        /// system browser, OUTSIDE the ASWebAuthenticationSession — the app
+        /// must forward the custom-scheme redirect via `handleCallback(_:)`.
+        case email
     }
 
     private struct ASMetadata: Decodable {
@@ -63,6 +67,26 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
 
     /// Retained for the lifetime of the browser session.
     private var webAuthSession: ASWebAuthenticationSession?
+
+    /// The in-flight authorization's callback continuation. Resumed exactly
+    /// once — by the web-auth sheet's completion, OR by an out-of-band
+    /// custom-scheme open (`handleCallback(_:)`) when the flow finished in
+    /// the system browser (email magic link).
+    private var callbackContinuation: CheckedContinuation<URL, Error>?
+
+    /// Forward a custom-scheme URL the OS delivered to the app (SwiftUI
+    /// `.onOpenURL`). Returns true when it completed an in-flight sign-in.
+    public func handleCallback(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == config.callbackScheme.lowercased(),
+              let continuation = callbackContinuation else { return false }
+        callbackContinuation = nil
+        // Dismiss the (now-superseded) sheet; its completion finds the
+        // continuation already nil and becomes a no-op.
+        webAuthSession?.cancel()
+        webAuthSession = nil
+        continuation.resume(returning: url)
+        return true
+    }
 
     public init(config: HadronClientConfig, keychain: KeychainStore) {
         self.config = config
@@ -173,29 +197,38 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
 
     private func runWebAuth(url: URL) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
+            self.callbackContinuation = continuation
+            // Single-resume guard: both the sheet's completion and an
+            // out-of-band handleCallback race for the one stored
+            // continuation; whoever takes it first wins, the loser no-ops.
+            let finish: (Result<URL, Error>) -> Void = { [weak self] result in
+                guard let self, let stored = self.callbackContinuation else { return }
+                self.callbackContinuation = nil
+                stored.resume(with: result)
+            }
             let session = ASWebAuthenticationSession(
                 url: url,
                 callbackURLScheme: config.callbackScheme
             ) { callbackURL, error in
                 if let error {
                     if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
-                        continuation.resume(throwing: OAuthError.userCancelled)
+                        finish(.failure(OAuthError.userCancelled))
                     } else {
-                        continuation.resume(throwing: OAuthError.authorizationFailed(error.localizedDescription))
+                        finish(.failure(OAuthError.authorizationFailed(error.localizedDescription)))
                     }
                     return
                 }
                 guard let callbackURL else {
-                    continuation.resume(throwing: OAuthError.missingCode)
+                    finish(.failure(OAuthError.missingCode))
                     return
                 }
-                continuation.resume(returning: callbackURL)
+                finish(.success(callbackURL))
             }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             self.webAuthSession = session
             if !session.start() {
-                continuation.resume(throwing: OAuthError.authorizationFailed("Couldn't start the sign-in session."))
+                finish(.failure(OAuthError.authorizationFailed("Couldn't start the sign-in session.")))
             }
         }
     }
