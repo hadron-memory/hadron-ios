@@ -38,6 +38,22 @@ xcodebuild -project HadronIOS.xcodeproj -scheme Hadron \
   -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 ```
 
+## TestFlight / App Store upload
+
+```bash
+xcodebuild -project HadronIOS.xcodeproj -scheme Hadron \
+  -destination 'generic/platform=iOS' -archivePath .build/Hadron.xcarchive \
+  archive CODE_SIGNING_ALLOWED=NO
+xcodebuild -exportArchive -archivePath .build/Hadron.xcarchive \
+  -exportOptionsPlist ExportOptions.plist -allowProvisioningUpdates
+```
+
+The archive is deliberately UNSIGNED: automatic dev-signing at archive time
+fails when the team has no registered devices, while the export step
+cloud-signs with the distribution identity (Xcode account or ASC API key)
+and uploads directly (`destination: upload` in ExportOptions.plist). Bump
+`CURRENT_PROJECT_VERSION` in project.yml before each upload.
+
 ## Things to know
 
 - **HadronKit** (`HadronKit/`) holds the shared client stack (OAuth, Keychain,
