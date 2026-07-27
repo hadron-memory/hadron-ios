@@ -24,7 +24,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.hadronmemory.ios
         PRODUCT_NAME: Hadron
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         # Match hadron-macapp: UI-driven, single-actor by design — Swift 5
         # language mode keeps concurrency checking pragmatic. Migrate both
         # apps to Swift 6 mode together, with HadronKit.
