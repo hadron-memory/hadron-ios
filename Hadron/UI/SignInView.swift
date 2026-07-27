@@ -20,7 +20,7 @@ struct SignInView: View {
             Text("Hadron")
                 .font(.largeTitle.bold())
 
-            Text("Your knowledge memory, wherever you are.")
+            Text("Knowledge lego-style")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -37,8 +37,8 @@ struct SignInView: View {
                 VStack(spacing: 10) {
                     providerButton("Continue with Apple", provider: .apple, symbol: "apple.logo")
                         .tint(.primary)
-                    providerButton("Continue with GitHub", provider: .github)
-                    providerButton("Continue with Google", provider: .google)
+                    providerButton("Continue with GitHub", provider: .github, asset: "GitHubMark")
+                    providerButton("Continue with Google", provider: .google, asset: "GoogleMark")
                 }
             }
 
@@ -69,7 +69,8 @@ struct SignInView: View {
     private func providerButton(
         _ title: String,
         provider: OAuthService.LoginProvider,
-        symbol: String? = nil
+        symbol: String? = nil,
+        asset: String? = nil
     ) -> some View {
         Button {
             state.signIn(with: provider)
@@ -77,6 +78,12 @@ struct SignInView: View {
             HStack(spacing: 6) {
                 if let symbol {
                     Image(systemName: symbol)
+                } else if let asset {
+                    // White brand glyphs generated from the portal's SVGs.
+                    Image(asset)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
                 }
                 Text(title)
             }
