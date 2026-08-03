@@ -28,8 +28,16 @@ struct SignInView: View {
             Spacer()
 
             if state.authState == .signingIn {
-                ProgressView("Signing in…")
-                    .padding(.bottom, 8)
+                VStack(spacing: 12) {
+                    ProgressView("Signing in…")
+                    // Always an exit: even if the auth sheet failed to present
+                    // (App Review 2.1(a), iPad), the user is never stuck here.
+                    Button("Cancel") {
+                        state.cancelSignIn()
+                    }
+                    .font(.subheadline)
+                }
+                .padding(.bottom, 8)
             } else {
                 // One button per identity provider — the server's authorize
                 // page routes its unauthenticated leg by login_provider, so

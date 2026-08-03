@@ -74,6 +74,20 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
     /// the system browser (email magic link).
     private var callbackContinuation: CheckedContinuation<URL, Error>?
 
+    /// Abort an in-flight sign-in (user-initiated). Dismisses the sheet and
+    /// resumes the flow with `userCancelled`. Safe to call when idle. This is
+    /// the escape hatch that guarantees the "Signing in…" state can never be
+    /// a dead end — even if the web sheet failed to present (App Review
+    /// 2.1(a), iPad).
+    public func cancel() {
+        webAuthSession?.cancel()
+        webAuthSession = nil
+        if let continuation = callbackContinuation {
+            callbackContinuation = nil
+            continuation.resume(throwing: OAuthError.userCancelled)
+        }
+    }
+
     /// Forward a custom-scheme URL the OS delivered to the app (SwiftUI
     /// `.onOpenURL`). Returns true when it completed an in-flight sign-in.
     public func handleCallback(_ url: URL) -> Bool {
@@ -126,10 +140,16 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
 
     // MARK: - Steps
 
+    /// Bounded wait on every OAuth HTTP leg — a stalled network must surface
+    /// as an error, never an indefinite spinner.
+    private static let requestTimeout: TimeInterval = 30
+
     private func fetchMetadata() async throws -> ASMetadata {
         let url = config.baseURL.appendingPathComponent(".well-known/oauth-authorization-server")
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            var request = URLRequest(url: url)
+            request.timeoutInterval = Self.requestTimeout
+            let (data, response) = try await URLSession.shared.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
                 throw OAuthError.discoveryFailed
             }
@@ -150,6 +170,7 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
+        request.timeoutInterval = Self.requestTimeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = [
             "redirect_uris": [config.redirectURI],
@@ -252,6 +273,7 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = Self.requestTimeout
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -277,12 +299,21 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
 
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         #if os(iOS)
-        let keyWindow = UIApplication.shared.connectedScenes
+        // Never fall back to a detached ASPresentationAnchor(): a windowless
+        // anchor makes the session silently fail to present — start() returns
+        // true, no completion ever fires, and the app hangs on "Signing in…"
+        // (the App Review 2.1(a) iPad rejection shape). Prefer the key window
+        // of the most-active scene, but accept ANY attached window before
+        // resorting to the detached fallback.
+        let scenes = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .filter { $0.activationState == .foregroundActive }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow)
-        return keyWindow ?? ASPresentationAnchor()
+            .sorted { activationRank($0.activationState) < activationRank($1.activationState) }
+        for scene in scenes {
+            if let window = scene.keyWindow ?? scene.windows.first {
+                return window
+            }
+        }
+        return ASPresentationAnchor()
         #elseif os(macOS)
         // Accessory apps have no key window; fall through the window list.
         return NSApplication.shared.keyWindow
@@ -290,6 +321,18 @@ public final class OAuthService: NSObject, ASWebAuthenticationPresentationContex
             ?? NSWindow()
         #endif
     }
+
+    #if os(iOS)
+    /// Scene ordering for anchor selection: active first, then inactive
+    /// (mid-transition — the iPad launch/alert race), then background.
+    private func activationRank(_ state: UIScene.ActivationState) -> Int {
+        switch state {
+        case .foregroundActive: return 0
+        case .foregroundInactive: return 1
+        default: return 2
+        }
+    }
+    #endif
 
     // MARK: - Helpers
 

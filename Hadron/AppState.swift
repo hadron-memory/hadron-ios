@@ -72,6 +72,14 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Abort an in-flight sign-in. The OAuthService cancel resumes the
+    /// authenticate() continuation with userCancelled, which signIn()'s catch
+    /// already maps to a clean signed-out state — this just guarantees the
+    /// user always has the escape hatch.
+    func cancelSignIn() {
+        oauth.cancel()
+    }
+
     /// Forward a custom-scheme URL from `.onOpenURL` — completes the email
     /// magic-link sign-in, whose final redirect arrives from the system
     /// browser rather than the in-app auth sheet.
